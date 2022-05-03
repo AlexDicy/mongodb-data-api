@@ -15,7 +15,8 @@
   },
   "files": [
     "CHANGELOG.md",
-    "dist"
+    "dist",
+    "src"
   ],
   "sideEffects": false,
   "main": "dist/mongodb-data-api.cjs.js",
