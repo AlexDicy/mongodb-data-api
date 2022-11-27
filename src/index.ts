@@ -10,41 +10,18 @@ type AnyKeys<T> = { [P in keyof T]?: T[P] | any }
 type Without<T, U> = { [P in Exclude<keyof T, keyof U>]?: never }
 type XOR<T, U> = T | U extends object ? (Without<T, U> & U) | (Without<U, T> & T) : T | U
 
-/**
- * Specific region of endpoint.
- * @link https://docs.atlas.mongodb.com/api/data-api-resources/#regional-requests
- */
-export enum Region {
-  Virginia = 'us-east-1',
-  Oregon = 'us-west-2',
-  Ireland = 'eu-west-1',
-  Sydney = 'ap-southeast-2'
-}
-
-// https://docs.atlas.mongodb.com/api/data-api-resources/#base-url
-const getUrlEndpoint = (appId: string, region?: Region) => {
-  return region
-    ? `https://${region}.aws.data.mongodb-api.com/app/${appId}/endpoint/data/beta`
-    : `https://data.mongodb-api.com/app/${appId}/endpoint/data/beta`
-}
-const getActionUrl = (endpoint: string, action: string) => {
-  return `${endpoint}/action/${action}`
-}
-
 type ExtendBaseParams<T> = BaseParams & T
-
 interface BaseParams {
   dataSource?: string
   database?: string
   collection?: string
-
   [key: string]: any
 }
 
 interface BaseConfig {
   /**
    * Specific Data API key.
-   * @link https://docs.atlas.mongodb.com/api/data-api/#2.-create-a-data-api-key
+   * @link https://www.mongodb.com/docs/atlas/api/data-api/#2.-create-a-data-api-key
    */
   apiKey: string
 }
@@ -52,7 +29,7 @@ interface BaseConfig {
 interface UrlEndpointConfig extends BaseConfig {
   /**
    * Specific URL Endpoint.
-   * @link https://docs.atlas.mongodb.com/api/data-api/#3.-send-a-data-api-request
+   * @link https://www.mongodb.com/docs/atlas/api/data-api/#3.-send-a-data-api-request
    */
   urlEndpoint: string
 }
@@ -60,10 +37,19 @@ interface UrlEndpointConfig extends BaseConfig {
 interface PackEndpointConfig extends BaseConfig {
   /**
    * Specific Data App ID.
-   * @link https://docs.atlas.mongodb.com/api/data-api/#3.-send-a-data-api-request
+   * @link https://www.mongodb.com/docs/atlas/api/data-api/#3.-send-a-data-api-request
    */
   appId: string
-  region?: Region
+  /**
+   * Specific region name of endpoint.
+   * @link https://www.mongodb.com/docs/atlas/api/data-api-resources/#regional-requests
+   */
+  region?: string
+  /**
+   * Specific cloud provider of endpoint.
+   * @link https://www.mongodb.com/docs/atlas/api/data-api-resources/#regional-requests
+   */
+  cloud?: string
 }
 
 export type Config = XOR<UrlEndpointConfig, PackEndpointConfig>
@@ -117,10 +103,10 @@ export class MongoDBDataAPI<InnerDoc = Document> {
 
   /**
    * Execute a API action.
-   * @link https://docs.atlas.mongodb.com/api/data-api-resources/
+   * @link https://www.mongodb.com/docs/atlas/api/data-api-resources/
    */
   public $$action<Result = unknown>(
-    name: string,
+    type: string,
     params: BaseParams = {}
   ): Promise<Result> {
     const mergedParams = {
@@ -132,36 +118,47 @@ export class MongoDBDataAPI<InnerDoc = Document> {
       return Promise.reject('Invalid params: dataSource, database, collection')
     }
 
-    const API_KEY_FIELD = 'api-key'
+    // https://www.mongodb.com/docs/atlas/api/data-api-resources/#base-url
+    // https://www.mongodb.com/docs/atlas/api/data-api-resources/#regional-requests
+    const getUrlEndpoint = (appId: string, region?: string, cloud?: string) => {
+      return region && cloud
+        ? `https://${region}.${cloud}.data.mongodb-api.com/app/${appId}/endpoint/data/v1`
+        : `https://data.mongodb-api.com/app/${appId}/endpoint/data/v1`
+    }
+
+    const getActionUrl = (endpoint: string, action: string) => {
+      return `${endpoint}/action/${action}`
+    }
 
     return fetch(
       this.#config.urlEndpoint
-        ? getActionUrl(this.#config.urlEndpoint, name)
-        : getActionUrl(getUrlEndpoint(this.#config.appId!, this.#config.region), name),
+        ? getActionUrl(this.#config.urlEndpoint, type)
+        : getActionUrl(
+          getUrlEndpoint(this.#config.appId!, this.#config.region, this.#config.cloud),
+          type
+        ),
       {
         method: 'post',
         body: JSON.stringify(mergedParams),
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Request-Headers': '*',
-          [API_KEY_FIELD]: this.#config.apiKey
+          'api-key': this.#config.apiKey
         }
       }
     )
       .then((response) => {
         return response.json()
       })
-      .catch((error) => {
-        // https://docs.atlas.mongodb.com/api/data-api-resources/#error-codes
-        const errorJSON = error.toJSON()
-        errorJSON.config.headers[API_KEY_FIELD] = '*****'
-        return Promise.reject(error.toJSON())
-      })
+      //.catch((error) => {
+      //  // https://www.mongodb.com/docs/atlas/api/data-api-resources/#error-codes
+      //  return Promise.reject(_axios.isAxiosError(error) ? error.toJSON() : error)
+      //})
   }
 
   /**
    * Find a Single Document.
-   * @link https://docs.atlas.mongodb.com/api/data-api-resources/#find-a-single-document
+   * @link https://www.mongodb.com/docs/atlas/api/data-api-resources/#find-a-single-document
    */
   public findOne<D = InnerDoc, T = NoInfer<D>>(
     params?: ExtendBaseParams<{
@@ -174,7 +171,7 @@ export class MongoDBDataAPI<InnerDoc = Document> {
 
   /**
    * Find Multiple Documents.
-   * @link https://docs.atlas.mongodb.com/api/data-api-resources/#find-multiple-documents
+   * @link https://www.mongodb.com/docs/atlas/api/data-api-resources/#find-multiple-documents
    */
   public find<D = InnerDoc, T = NoInfer<D>>(
     params?: ExtendBaseParams<{
@@ -190,7 +187,7 @@ export class MongoDBDataAPI<InnerDoc = Document> {
 
   /**
    * Insert a Single Document.
-   * @link https://docs.atlas.mongodb.com/api/data-api-resources/#insert-a-single-document
+   * @link https://www.mongodb.com/docs/atlas/api/data-api-resources/#insert-a-single-document
    */
   public insertOne<D = InnerDoc, T = NoInfer<D>>(
     params: ExtendBaseParams<{ document: AnyKeys<T> | Document }>
@@ -200,7 +197,7 @@ export class MongoDBDataAPI<InnerDoc = Document> {
 
   /**
    * Insert Multiple Documents.
-   * @link https://docs.atlas.mongodb.com/api/data-api-resources/#insert-multiple-documents
+   * @link https://www.mongodb.com/docs/atlas/api/data-api-resources/#insert-multiple-documents
    */
   public insertMany<D = InnerDoc, T = NoInfer<D>>(
     params: ExtendBaseParams<{ documents: Array<AnyKeys<T> | Document> }>
@@ -210,7 +207,7 @@ export class MongoDBDataAPI<InnerDoc = Document> {
 
   /**
    * Update a Single Document.
-   * @link https://docs.atlas.mongodb.com/api/data-api-resources/#update-a-single-document
+   * @link https://www.mongodb.com/docs/atlas/api/data-api-resources/#update-a-single-document
    */
   public updateOne<D = InnerDoc, T = NoInfer<D>>(
     params: ExtendBaseParams<{
@@ -228,7 +225,7 @@ export class MongoDBDataAPI<InnerDoc = Document> {
 
   /**
    * Update Multiple Documents.
-   * @link https://docs.atlas.mongodb.com/api/data-api-resources/#update-multiple-documents
+   * @link https://www.mongodb.com/docs/atlas/api/data-api-resources/#update-multiple-documents
    */
   public updateMany<D = InnerDoc, T = NoInfer<D>>(
     params: ExtendBaseParams<{
@@ -246,7 +243,7 @@ export class MongoDBDataAPI<InnerDoc = Document> {
 
   /**
    * Replace a Single Document.
-   * @link https://docs.atlas.mongodb.com/api/data-api-resources/#replace-a-single-document
+   * @link https://www.mongodb.com/docs/atlas/api/data-api-resources/#replace-a-single-document
    */
   public replaceOne<D = InnerDoc, T = NoInfer<D>>(
     params: ExtendBaseParams<{
@@ -264,7 +261,7 @@ export class MongoDBDataAPI<InnerDoc = Document> {
 
   /**
    * Delete a Single Document.
-   * @link https://docs.atlas.mongodb.com/api/data-api-resources/#delete-a-single-document
+   * @link https://www.mongodb.com/docs/atlas/api/data-api-resources/#delete-a-single-document
    */
   public deleteOne<D = InnerDoc, T = NoInfer<D>>(
     params: ExtendBaseParams<{ filter: Filter<T> }>
@@ -274,7 +271,7 @@ export class MongoDBDataAPI<InnerDoc = Document> {
 
   /**
    * Delete Multiple Documents.
-   * @link https://docs.atlas.mongodb.com/api/data-api-resources/#delete-multiple-documents
+   * @link https://www.mongodb.com/docs/atlas/api/data-api-resources/#delete-multiple-documents
    */
   public deleteMany<D = InnerDoc, T = NoInfer<D>>(
     params: ExtendBaseParams<{ filter: Filter<T> }>
@@ -284,7 +281,7 @@ export class MongoDBDataAPI<InnerDoc = Document> {
 
   /**
    * Run an Aggregation Pipeline.
-   * @link https://docs.atlas.mongodb.com/api/data-api-resources/#run-an-aggregation-pipeline
+   * @link https://www.mongodb.com/docs/atlas/api/data-api-resources/#run-an-aggregation-pipeline
    */
   public aggregate<T extends Array<any>>(
     params: ExtendBaseParams<{ pipeline: Array<Document> }>
