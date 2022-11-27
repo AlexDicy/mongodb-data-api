@@ -134,9 +134,9 @@ export class MongoDBDataAPI<InnerDoc = Document> {
       this.#config.urlEndpoint
         ? getActionUrl(this.#config.urlEndpoint, type)
         : getActionUrl(
-          getUrlEndpoint(this.#config.appId!, this.#config.region, this.#config.cloud),
-          type
-        ),
+            getUrlEndpoint(this.#config.appId!, this.#config.region, this.#config.cloud),
+            type
+          ),
       {
         method: 'post',
         body: JSON.stringify(mergedParams),
@@ -146,14 +146,13 @@ export class MongoDBDataAPI<InnerDoc = Document> {
           'api-key': this.#config.apiKey
         }
       }
-    )
-      .then((response) => {
-        return response.json()
-      })
-      //.catch((error) => {
-      //  // https://www.mongodb.com/docs/atlas/api/data-api-resources/#error-codes
-      //  return Promise.reject(_axios.isAxiosError(error) ? error.toJSON() : error)
-      //})
+    ).then((response) => {
+      return response.json()
+    })
+    //.catch((error) => {
+    //  // https://www.mongodb.com/docs/atlas/api/data-api-resources/#error-codes
+    //  return Promise.reject(_axios.isAxiosError(error) ? error.toJSON() : error)
+    //})
   }
 
   /**
